@@ -13,7 +13,7 @@ void IRAM_ATTR HOT RemoteReceiverComponentStore::gpio_intr(RemoteReceiverCompone
   const uint32_t now = micros();
   // If the lhs is 1 (rising edge) we should write to an uneven index and vice versa
   const uint32_t next = (arg->buffer_write_at + 1) % arg->buffer_size;
-  const bool level = arg->pin.digital_read();
+  const bool level = !arg->pin.digital_read();
   if (level != next % 2)
     return;
 
@@ -58,7 +58,7 @@ void TuyaRfComponent::set_receiver(bool on) {
       memset(buf, 0, s.buffer_size * sizeof(uint32_t));
     }
     // First index is a space (signal is inverted)
-    if (this->RemoteReceiverBase::pin_->digital_read()) {
+    if (!this->RemoteReceiverBase::pin_->digital_read()) {
       s.buffer_write_at = s.buffer_read_at = 1;
     } else {
       s.buffer_write_at = s.buffer_read_at = 0;
@@ -110,7 +110,7 @@ void TuyaRfComponent::dump_config() {
   LOG_PIN("  Tx Pin: ",this->RemoteTransmitterBase::pin_);
   LOG_PIN("  Rx Pin: ", this->RemoteReceiverBase::pin_);
   //probably the warning isn't useful due to the noisy signal
-  if (this->RemoteReceiverBase::pin_->digital_read()) {
+  if (!this->RemoteReceiverBase::pin_->digital_read()) {
     ESP_LOGW(TAG, "Remote Receiver Signal starts with a HIGH value. Usually this means you have to "
                   "invert the signal using 'inverted: True' in the pin schema!");
     ESP_LOGW(TAG, "It could also be that the signal is noisy.");
@@ -341,7 +341,8 @@ void TuyaRfComponent::loop() {
   const uint32_t reserve_size = 1 + (s.buffer_size + new_write_at - s.buffer_read_at) % s.buffer_size;
   this->RemoteReceiverBase::temp_.clear();
   this->RemoteReceiverBase::temp_.reserve(reserve_size);
-  int32_t multiplier = s.buffer_read_at % 2 == 0 ? 1 : -1;
+  // Flip sign so received durations match transmit convention (marks positive, spaces negative)
+  int32_t multiplier = s.buffer_read_at % 2 == 0 ? -1 : 1;
 
   for (uint32_t i = 0; prev != new_write_at; i++) {
     int32_t delta = s.buffer[s.buffer_read_at] - s.buffer[prev];
