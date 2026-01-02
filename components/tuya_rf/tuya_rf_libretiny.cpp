@@ -342,7 +342,7 @@ void TuyaRfComponent::loop() {
   this->RemoteReceiverBase::temp_.clear();
   this->RemoteReceiverBase::temp_.reserve(reserve_size);
   // Flip sign so received durations match transmit convention (marks positive, spaces negative)
-  int32_t multiplier = s.buffer_read_at % 2 == 0 ? -1 : 1;
+  int32_t multiplier = s.buffer_read_at % 2 == 0 ? 1 : -1;
 
   for (uint32_t i = 0; prev != new_write_at; i++) {
     int32_t delta = s.buffer[s.buffer_read_at] - s.buffer[prev];
