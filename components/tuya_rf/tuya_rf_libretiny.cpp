@@ -13,7 +13,7 @@ void IRAM_ATTR HOT RemoteReceiverComponentStore::gpio_intr(RemoteReceiverCompone
   const uint32_t now = micros();
   // If the lhs is 1 (rising edge) we should write to an uneven index and vice versa
   const uint32_t next = (arg->buffer_write_at + 1) % arg->buffer_size;
-  const bool level = !arg->pin.digital_read();
+  const bool level = arg->pin.digital_read();
   if (level != next % 2)
     return;
 
@@ -58,7 +58,7 @@ void TuyaRfComponent::set_receiver(bool on) {
       memset(buf, 0, s.buffer_size * sizeof(uint32_t));
     }
     // First index is a space (signal is inverted)
-    if (!this->RemoteReceiverBase::pin_->digital_read()) {
+    if (this->RemoteReceiverBase::pin_->digital_read()) {
       s.buffer_write_at = s.buffer_read_at = 1;
     } else {
       s.buffer_write_at = s.buffer_read_at = 0;
@@ -110,7 +110,7 @@ void TuyaRfComponent::dump_config() {
   LOG_PIN("  Tx Pin: ",this->RemoteTransmitterBase::pin_);
   LOG_PIN("  Rx Pin: ", this->RemoteReceiverBase::pin_);
   //probably the warning isn't useful due to the noisy signal
-  if (!this->RemoteReceiverBase::pin_->digital_read()) {
+  if (this->RemoteReceiverBase::pin_->digital_read()) {
     ESP_LOGW(TAG, "Remote Receiver Signal starts with a HIGH value. Usually this means you have to "
                   "invert the signal using 'inverted: True' in the pin schema!");
     ESP_LOGW(TAG, "It could also be that the signal is noisy.");
@@ -141,13 +141,13 @@ void TuyaRfComponent::await_target_time_() {
 
 void TuyaRfComponent::mark_(uint32_t usec) {
   this->await_target_time_();
-  this->RemoteTransmitterBase::pin_->digital_write(false);
+  this->RemoteTransmitterBase::pin_->digital_write(true);
   this->target_time_ += usec;
 }
 
 void TuyaRfComponent::space_(uint32_t usec) {
   this->await_target_time_();
-  this->RemoteTransmitterBase::pin_->digital_write(true);
+  this->RemoteTransmitterBase::pin_->digital_write(false);
   this->target_time_ += usec;
 }
 
@@ -171,6 +171,7 @@ void IRAM_ATTR TuyaRfComponent::send_internal(uint32_t send_times, uint32_t send
   this->RemoteTransmitterBase::pin_->digital_write(false);
 
   int res=StartTx();
+  this->RemoteTransmitterBase::pin_->digital_write(false);
   switch(res) {
     case 0:
       //ESP_LOGD(TAG,"StartTx ok");
